@@ -1,38 +1,7 @@
-name: Auto Update Stock Data
-on:
-  schedule:
-    - cron: '30 07 * * *'
-    - cron: '00 10 * * *'
-  workflow_dispatch:
-jobs:
-  update-data:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Run ETL Collector
-        env:
-          FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
-        run: python data_collector.py
-      - name: Commit and push changes
+- name: Commit and push changes
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          
-          git add final_database.csv
-          
-          # 檢查是否有改動
-          if ! git diff --quiet --cached; then
-            git commit -m "Auto-update stock data"
-            # 不執行任何 pull/rebase，直接強制推送到遠端，解決所有衝突
-            git push origin HEAD:main --force
-          else
-            echo "No changes to commit."
-          fi
+          git add .
+          git commit -m "Auto-update" || echo "No changes"
+          git push
