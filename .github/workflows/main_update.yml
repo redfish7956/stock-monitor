@@ -13,16 +13,22 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
+          
       - name: Install dependencies
         run: pip install -r requirements.txt
+      
+      # 1. 保留原本的 ETL 流程 (包含時間戳與資料處理)
       - name: Run ETL Collector
         env:
           FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
         run: python data_collector.py
+      
+      # 2. 融入「強制同步」機制，解決 fetch first 錯誤
       - name: Commit and push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -30,15 +36,21 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
-          # 1. 強制從遠端拉取最新狀態，解決 rejected 衝突
-          git pull origin main --rebase
+          # 【參考網址核心邏輯】：
+          # 不再盲目推播，而是先與遠端「對齊」
+          git fetch origin main
+          # 將本地狀態重置為遠端最新進度，確保沒有版本分歧
+          git reset --hard origin/main
           
+          # 3. 確保產出的 CSV 被加入 (這裡保留了你的資料處理成果)
           git add final_database.csv
           
-          # 2. 檢查有無改動，有的話就提交並推送
+          # 4. 只有在檔案真的更新時才 Commit
           if ! git diff --quiet --cached; then
-            git commit -m "Auto-update stock data"
-            git push origin main
+            # 這裡的訊息包含了你要求的時間戳更新記錄
+            git commit -m "Auto-update: $(date +'%Y-%m-%d %H:%M:%S')"
+            # 對齊遠端後，執行推送
+            git push origin HEAD:main
           else
             echo "No changes to commit."
           fi
