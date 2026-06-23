@@ -27,8 +27,18 @@ jobs:
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          # 將 CSV 加入暫存區
           git add final_database.csv
-          # 強制同步並合併遠端變更，解決衝突
-          git pull --rebase origin main
-          # 若有變更則提交，無變更則跳過
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update stock data" && git push origin main)
+          
+          # 檢查是否有改動
+          if ! git diff --quiet --cached; then
+            git commit -m "Auto-update stock data"
+            
+            # 自動偵測分支並執行強制推送，解決同步衝突
+            BRANCH_NAME=${GITHUB_REF#refs/heads/}
+            git pull --rebase origin $BRANCH_NAME
+            git push origin $BRANCH_NAME --force
+          else
+            echo "No changes to commit."
+          fi
