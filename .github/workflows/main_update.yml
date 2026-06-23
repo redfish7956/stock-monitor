@@ -23,18 +23,22 @@ jobs:
         env:
           FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
         run: python data_collector.py
-      - name: Push file via API
+      - name: Commit and push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 1. 將 CSV 轉為 Base64
-          CONTENT=$(base64 -w 0 final_database.csv)
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
-          # 2. 獲取當前檔案的 SHA (GitHub API 更新檔案的必要條件)
-          SHA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/contents/final_database.csv" | jq -r .sha)
+          # 1. 強制從遠端拉取最新狀態，解決 rejected 衝突
+          git pull origin main --rebase
           
-          # 3. 透過 API 強制覆寫檔案 (這不會觸發 Git 的衝突保護)
-          curl -X PUT -H "Authorization: token $GITHUB_TOKEN" \
-            -d "{\"message\":\"Auto-update stock data\",\"content\":\"$CONTENT\",\"sha\":\"$SHA\"}" \
-            "https://api.github.com/repos/${{ github.repository }}/contents/final_database.csv"
+          git add final_database.csv
+          
+          # 2. 檢查有無改動，有的話就提交並推送
+          if ! git diff --quiet --cached; then
+            git commit -m "Auto-update stock data"
+            git push origin main
+          else
+            echo "No changes to commit."
+          fi
