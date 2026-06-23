@@ -11,8 +11,6 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -28,17 +26,13 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
-          # 將 CSV 加入暫存區
           git add final_database.csv
           
           # 檢查是否有改動
           if ! git diff --quiet --cached; then
             git commit -m "Auto-update stock data"
-            
-            # 自動偵測分支並執行強制推送，解決同步衝突
-            BRANCH_NAME=${GITHUB_REF#refs/heads/}
-            git pull --rebase origin $BRANCH_NAME
-            git push origin $BRANCH_NAME --force
+            # 不執行任何 pull/rebase，直接強制推送到遠端，解決所有衝突
+            git push origin HEAD:main --force
           else
             echo "No changes to commit."
           fi
