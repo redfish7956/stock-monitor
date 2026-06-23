@@ -9,7 +9,6 @@ on:
 jobs:
   update-data:
     runs-on: ubuntu-latest
-    # 這是關鍵：明確授權寫入權限
     permissions:
       contents: write
     steps:
@@ -26,19 +25,20 @@ jobs:
         run: python data_collector.py
       - name: Commit and push
         env:
-          # 將 Token 注入到環境變數中
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
-          # 將 Token 注入到遠端 URL
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          # 強制讓 Actions 本地狀態與遠端 main 分支同步，消除一切 Rejected 衝突
+          git fetch origin main
+          git reset --hard origin/main
           
           git add final_database.csv
           
           if ! git diff --quiet --cached; then
             git commit -m "Auto-update stock data"
+            # 強制推送到遠端
             git push origin HEAD:main --force
           else
             echo "No changes to commit."
