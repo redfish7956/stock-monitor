@@ -30,15 +30,17 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
-          # 強制讓 Actions 本地狀態與遠端 main 分支同步，消除一切 Rejected 衝突
+          # 清除所有本地修改，強制同步遠端分支狀態
           git fetch origin main
           git reset --hard origin/main
           
+          # 新增檔案
           git add final_database.csv
           
+          # 檢查有無變更並推送
           if ! git diff --quiet --cached; then
             git commit -m "Auto-update stock data"
-            # 強制推送到遠端
+            # 這是最強制的推送指令
             git push origin HEAD:main --force
           else
             echo "No changes to commit."
