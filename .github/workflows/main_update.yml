@@ -22,33 +22,31 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       
-      # 完整保留 ETL 處理與時間戳邏輯
+      # 1. 執行你的 ETL (完整保留你的時間戳與資料處理邏輯)
       - name: Run ETL Collector
         env:
           FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
         run: python data_collector.py
       
-      # 處理 Git 推送的最終版本
-      - name: Commit and push
+      # 2. 繞過 Git 的 API 強制覆蓋 (徹底解決 Rejected 衝突)
+      - name: Upload file via API
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          # 安裝 JSON 解析工具
+          sudo apt-get install -y jq
           
-          # 1. 抓取遠端最新狀態 (包含所有其他流程產生的提交)
-          git fetch origin main
+          # 將檔案轉換為 Base64
+          CONTENT=$(base64 -w 0 final_database.csv)
           
-          # 2. 強制將本地環境重置為與遠端完全一致 (徹底消除 fetch first 衝突)
-          git reset --hard origin/main
+          # 取得檔案目前的 SHA (這是 API 覆寫檔案的必要條件)
+          FILE_PATH="final_database.csv"
+          URL="https://api.github.com/repos/${{ github.repository }}/contents/$FILE_PATH"
           
-          # 3. 確保資料已寫入暫存區
-          git add final_database.csv
+          # 獲取 SHA 值
+          SHA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$URL" | jq -r .sha)
           
-          # 4. 提交並使用強制推送 (確保這是一個原子性的覆蓋操作)
-          if ! git diff --quiet --cached; then
-            git commit -m "Auto-update: $(date +'%Y-%m-%d %H:%M:%S')"
-            git push origin HEAD:main --force
-          else
-            echo "No changes to commit."
-          fi
+          # 直接透過 API 寫入，這不會觸發 Git 的任何檢查
+          curl -X PUT -H "Authorization: token $GITHUB_TOKEN" \
+            -d "{\"message\":\"Auto-update: $(date +'%Y-%m-%d %H:%M:%S')\",\"content\":\"$CONTENT\",\"sha\":\"$SHA\"}" \
+            "$URL"
