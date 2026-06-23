@@ -22,13 +22,13 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       
-      # 完整保留你的 ETL 處理邏輯
+      # 完整保留 ETL 處理與時間戳邏輯
       - name: Run ETL Collector
         env:
           FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
         run: python data_collector.py
       
-      # 整合後的 Git 處理邏輯
+      # 處理 Git 推送的最終版本
       - name: Commit and push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -36,19 +36,19 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
-          # 1. 抓取遠端變更，並強行合併 (滿足 Git 的快轉檢查)
+          # 1. 抓取遠端最新狀態 (包含所有其他流程產生的提交)
           git fetch origin main
-          git merge origin/main --no-edit
           
-          # 2. 將你剛剛產出的 CSV 加入暫存
+          # 2. 強制將本地環境重置為與遠端完全一致 (徹底消除 fetch first 衝突)
+          git reset --hard origin/main
+          
+          # 3. 確保資料已寫入暫存區
           git add final_database.csv
           
-          # 3. 只有變更時才 Commit
+          # 4. 提交並使用強制推送 (確保這是一個原子性的覆蓋操作)
           if ! git diff --quiet --cached; then
             git commit -m "Auto-update: $(date +'%Y-%m-%d %H:%M:%S')"
-            
-            # 4. 關鍵：如果 push 失敗，這行指令會捕獲錯誤並進行最後的強制同步
-            git push origin HEAD:main || (git pull --rebase origin main && git push origin HEAD:main)
+            git push origin HEAD:main --force
           else
             echo "No changes to commit."
           fi
